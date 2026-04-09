@@ -14,7 +14,7 @@ int vectra_core_step(VectraState* state, const uint8_t* input, size_t input_len,
 int vectra_core_collapse(const VectraState* state, uint8_t* output, size_t output_len);
 int vectra_core_inject(VectraState* state, const uint8_t* patch, size_t patch_len);
 
-/* Implemented in src/main/asm/vectra_pulse.S */
+/* Implemented in src/main/asm/vectra_pulse.S (x86_64) and src/main/asm/vectra_pulse_aarch64.S (aarch64). */
 void vectra_pulse_mix(uint32_t* lane, const uint32_t* aux, const uint32_t* pulse, size_t len);
 
 #endif

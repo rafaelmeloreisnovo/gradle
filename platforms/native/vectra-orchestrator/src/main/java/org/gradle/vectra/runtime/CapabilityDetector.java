@@ -16,20 +16,26 @@ public class CapabilityDetector {
 
     private final SystemInspector systemInspector;
     private final ToolchainProbe toolchainProbe;
+    private final SimdProbe simdProbe;
 
     public CapabilityDetector() {
-        this(new JvmSystemInspector(), new ProcessToolchainProbe());
+        this(new JvmSystemInspector(), new ProcessToolchainProbe(), new ProcessSimdProbe());
     }
 
     CapabilityDetector(SystemInspector systemInspector, ToolchainProbe toolchainProbe) {
+        this(systemInspector, toolchainProbe, new NoOpSimdProbe());
+    }
+
+    CapabilityDetector(SystemInspector systemInspector, ToolchainProbe toolchainProbe, SimdProbe simdProbe) {
         this.systemInspector = systemInspector;
         this.toolchainProbe = toolchainProbe;
+        this.simdProbe = simdProbe;
     }
 
     public CapabilityReport detect() {
         CapabilityReport.OperatingSystem operatingSystem = detectOperatingSystem(systemInspector.osName());
         CapabilityReport.Architecture architecture = detectArchitecture(systemInspector.osArch());
-        Set<CapabilityReport.SimdInstruction> simdInstructions = detectSimdInstructions(architecture, systemInspector.simdHint());
+        Set<CapabilityReport.SimdInstruction> simdInstructions = detectSimdInstructions(architecture, operatingSystem, systemInspector.simdHint());
         CapabilityReport.ToolchainAvailability toolchainAvailability = detectToolchainAvailability(operatingSystem);
 
         return new CapabilityReport(operatingSystem, architecture, simdInstructions, toolchainAvailability);
@@ -60,14 +66,21 @@ public class CapabilityDetector {
         return CapabilityReport.Architecture.OTHER;
     }
 
-    private Set<CapabilityReport.SimdInstruction> detectSimdInstructions(CapabilityReport.Architecture architecture, String simdHint) {
+    private Set<CapabilityReport.SimdInstruction> detectSimdInstructions(
+        CapabilityReport.Architecture architecture,
+        CapabilityReport.OperatingSystem operatingSystem,
+        String simdHint
+    ) {
         EnumSet<CapabilityReport.SimdInstruction> simdInstructions = EnumSet.noneOf(CapabilityReport.SimdInstruction.class);
 
+        // Baseline defaults when probing is unavailable.
         if (architecture == CapabilityReport.Architecture.X86_64) {
             simdInstructions.add(CapabilityReport.SimdInstruction.SSE2);
         } else if (architecture == CapabilityReport.Architecture.AARCH64) {
             simdInstructions.add(CapabilityReport.SimdInstruction.NEON);
         }
+
+        simdInstructions.addAll(simdProbe.detect(architecture, operatingSystem));
 
         if (simdHint != null && !simdHint.isBlank()) {
             Arrays.stream(simdHint.split(","))
@@ -122,6 +135,10 @@ public class CapabilityDetector {
         boolean isAvailable(String command);
     }
 
+    interface SimdProbe {
+        Set<CapabilityReport.SimdInstruction> detect(CapabilityReport.Architecture architecture, CapabilityReport.OperatingSystem os);
+    }
+
     private static class JvmSystemInspector implements SystemInspector {
 
         @Override
@@ -137,6 +154,85 @@ public class CapabilityDetector {
         @Override
         public String simdHint() {
             return System.getProperty(SIMD_HINT_PROPERTY, "");
+        }
+    }
+
+    private static class NoOpSimdProbe implements SimdProbe {
+        @Override
+        public Set<CapabilityReport.SimdInstruction> detect(CapabilityReport.Architecture architecture, CapabilityReport.OperatingSystem os) {
+            return EnumSet.noneOf(CapabilityReport.SimdInstruction.class);
+        }
+    }
+
+    private static class ProcessSimdProbe implements SimdProbe {
+        @Override
+        public Set<CapabilityReport.SimdInstruction> detect(CapabilityReport.Architecture architecture, CapabilityReport.OperatingSystem os) {
+            EnumSet<CapabilityReport.SimdInstruction> detected = EnumSet.noneOf(CapabilityReport.SimdInstruction.class);
+            try {
+                if (architecture == CapabilityReport.Architecture.X86_64) {
+                    String flags = captureFlags(os, "lscpu", "sysctl", "wmic");
+                    if (containsFlag(flags, "sse2")) {
+                        detected.add(CapabilityReport.SimdInstruction.SSE2);
+                    }
+                    if (containsFlag(flags, "avx2")) {
+                        detected.add(CapabilityReport.SimdInstruction.AVX2);
+                    }
+                } else if (architecture == CapabilityReport.Architecture.AARCH64) {
+                    String flags = captureFlags(os, "lscpu", "sysctl");
+                    if (containsFlag(flags, "neon") || containsFlag(flags, "asimd")) {
+                        detected.add(CapabilityReport.SimdInstruction.NEON);
+                    }
+                }
+            } catch (Exception ignored) {
+                // Keep baseline fallback.
+            }
+            return detected;
+        }
+
+        private boolean containsFlag(String text, String flag) {
+            return text.toLowerCase(Locale.ROOT).contains(flag.toLowerCase(Locale.ROOT));
+        }
+
+        private String captureFlags(CapabilityReport.OperatingSystem os, String... candidates) throws IOException, InterruptedException {
+            for (String candidate : candidates) {
+                ProcessBuilder pb = commandFor(os, candidate);
+                if (pb == null) {
+                    continue;
+                }
+                pb.redirectErrorStream(true);
+                Process p = pb.start();
+                if (!p.waitFor(500, TimeUnit.MILLISECONDS)) {
+                    p.destroyForcibly();
+                    continue;
+                }
+                byte[] bytes = p.getInputStream().readAllBytes();
+                if (bytes.length > 0) {
+                    return new String(bytes);
+                }
+            }
+            return "";
+        }
+
+        private ProcessBuilder commandFor(CapabilityReport.OperatingSystem os, String candidate) {
+            switch (candidate) {
+                case "lscpu":
+                    if (os == CapabilityReport.OperatingSystem.LINUX) {
+                        return new ProcessBuilder("lscpu");
+                    }
+                    return null;
+                case "sysctl":
+                    if (os == CapabilityReport.OperatingSystem.MACOS) {
+                        return new ProcessBuilder("sysctl", "-a");
+                    }
+                    return null;
+                case "wmic":
+                    if (os == CapabilityReport.OperatingSystem.WINDOWS) {
+                        return new ProcessBuilder("wmic", "cpu", "get", "Caption,Name,SocketDesignation,ProcessorType,DataWidth", "/format:list");
+                    }
+                    return null;
+                default:
+                    return null;
+            }
         }
     }
 

@@ -2,6 +2,7 @@ package org.gradle.vectra.runtime;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,6 +37,44 @@ class BackendSelectorTest {
         BackendSelector.SelectionDecision decision = backendSelector.select(capabilityReport);
 
         assertEquals(BackendSelector.Backend.NATIVE_C, decision.getBackend());
+    }
+
+    @Test
+    void fallsBackToNativeCOnAarch64EvenWhenAssemblerExists() {
+        CapabilityReport capabilityReport = new CapabilityReport(
+            CapabilityReport.OperatingSystem.LINUX,
+            CapabilityReport.Architecture.AARCH64,
+            EnumSet.of(CapabilityReport.SimdInstruction.NEON),
+            new CapabilityReport.ToolchainAvailability(true, true)
+        );
+
+        BackendSelector.SelectionDecision decision = backendSelector.select(capabilityReport);
+
+        assertEquals(BackendSelector.Backend.NATIVE_C, decision.getBackend());
+    }
+
+    @Test
+    void fallsBackToNativeCAfterAsmLoadFailure() {
+        CapabilityReport capabilityReport = new CapabilityReport(
+            CapabilityReport.OperatingSystem.LINUX,
+            CapabilityReport.Architecture.X86_64,
+            EnumSet.of(CapabilityReport.SimdInstruction.SSE2),
+            new CapabilityReport.ToolchainAvailability(true, true)
+        );
+
+        ArrayList<String> warnings = new ArrayList<>();
+        BackendSelector.SelectionDecision decision = backendSelector.selectWithFallback(
+            capabilityReport,
+            backend -> {
+                if (backend == BackendSelector.Backend.NATIVE_ASM) {
+                    throw new VectraNativeLoadException("asm unavailable");
+                }
+            },
+            warnings::add
+        );
+
+        assertEquals(BackendSelector.Backend.NATIVE_C, decision.getBackend());
+        assertEquals(1, warnings.size());
     }
 
     @Test
