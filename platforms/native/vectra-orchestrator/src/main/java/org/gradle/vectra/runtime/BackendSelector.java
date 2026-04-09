@@ -1,0 +1,82 @@
+package org.gradle.vectra.runtime;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Maps capabilities to backend selection policies.
+ * Priority order: native assembly > native C > pure Java.
+ */
+public class BackendSelector {
+
+    public SelectionDecision select(CapabilityReport capabilityReport) {
+        List<String> reasons = new ArrayList<>();
+
+        if (supportsNativeAssembly(capabilityReport)) {
+            reasons.add("Native assembly backend selected: supported platform, architecture, SIMD and assembler toolchain.");
+            return new SelectionDecision(Backend.NATIVE_ASM, reasons);
+        }
+
+        reasons.add("Native assembly backend skipped due to missing policy requirements.");
+
+        if (supportsNativeC(capabilityReport)) {
+            reasons.add("Native C backend selected: C toolchain available on supported platform/architecture.");
+            return new SelectionDecision(Backend.NATIVE_C, reasons);
+        }
+
+        reasons.add("Native C backend skipped due to missing policy requirements.");
+        reasons.add("Falling back to pure Java backend.");
+        return new SelectionDecision(Backend.JAVA_PURE, reasons);
+    }
+
+    private boolean supportsNativeAssembly(CapabilityReport capabilityReport) {
+        return isSupportedPlatform(capabilityReport)
+            && isSupportedArchitecture(capabilityReport)
+            && !capabilityReport.getSimdInstructions().isEmpty()
+            && capabilityReport.getToolchainAvailability().isAssemblerAvailable();
+    }
+
+    private boolean supportsNativeC(CapabilityReport capabilityReport) {
+        return isSupportedPlatform(capabilityReport)
+            && isSupportedArchitecture(capabilityReport)
+            && capabilityReport.getToolchainAvailability().isCCompilerAvailable();
+    }
+
+    private boolean isSupportedPlatform(CapabilityReport capabilityReport) {
+        CapabilityReport.OperatingSystem os = capabilityReport.getOperatingSystem();
+        return os == CapabilityReport.OperatingSystem.LINUX
+            || os == CapabilityReport.OperatingSystem.MACOS
+            || os == CapabilityReport.OperatingSystem.WINDOWS;
+    }
+
+    private boolean isSupportedArchitecture(CapabilityReport capabilityReport) {
+        CapabilityReport.Architecture architecture = capabilityReport.getArchitecture();
+        return architecture == CapabilityReport.Architecture.X86_64
+            || architecture == CapabilityReport.Architecture.AARCH64;
+    }
+
+    public enum Backend {
+        NATIVE_ASM,
+        NATIVE_C,
+        JAVA_PURE
+    }
+
+    public static class SelectionDecision {
+
+        private final Backend backend;
+        private final List<String> reasons;
+
+        public SelectionDecision(Backend backend, List<String> reasons) {
+            this.backend = backend;
+            this.reasons = List.copyOf(reasons);
+        }
+
+        public Backend getBackend() {
+            return backend;
+        }
+
+        public List<String> getReasons() {
+            return reasons;
+        }
+    }
+}
