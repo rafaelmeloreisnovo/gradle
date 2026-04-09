@@ -2,7 +2,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
 
 #define VECTRA_BRIDGE_MAX_CONTEXTS 8u
 
@@ -14,6 +13,12 @@ typedef struct __attribute__((aligned(64))) VectraBridgeContext {
 } VectraBridgeContext;
 
 static VectraBridgeContext VECTRA_CONTEXT_POOL[VECTRA_BRIDGE_MAX_CONTEXTS];
+
+static void clear_bytes(uint8_t* bytes, size_t len) {
+    for (size_t i = 0; i < len; ++i) {
+        bytes[i] = 0;
+    }
+}
 
 static VectraBridgeContext* context_from_handle(int64_t handle) {
     if (handle <= 0) {
@@ -32,14 +37,27 @@ static VectraBridgeContext* context_from_handle(int64_t handle) {
 /*
  * C ABI chosen to be callable from JNI glue or Panama downcalls.
  * Handle lifecycle is explicit: init -> step/collapse/inject -> release.
+ * Caller can optionally provide seed/scratch bytes.
  */
-int64_t vectra_bridge_init(void) {
+int64_t vectra_bridge_init(const uint8_t* seed, size_t seed_len, const uint8_t* scratch_seed, size_t scratch_len) {
     for (uint64_t i = 0; i < VECTRA_BRIDGE_MAX_CONTEXTS; ++i) {
         VectraBridgeContext* context = &VECTRA_CONTEXT_POOL[i];
         if (context->in_use == 0u) {
-            memset(context, 0, sizeof(*context));
+            clear_bytes((uint8_t*) context, sizeof(*context));
             context->in_use = 1u;
             vectra_state_init(&context->state);
+
+            if (seed != NULL && seed_len > 0) {
+                vectra_core_inject(&context->state, seed, seed_len);
+            }
+
+            if (scratch_seed != NULL && scratch_len > 0) {
+                const size_t max_copy = scratch_len < VECTRA_SCRATCH_SIZE_BYTES ? scratch_len : VECTRA_SCRATCH_SIZE_BYTES;
+                for (size_t k = 0; k < max_copy; ++k) {
+                    context->scratch[k] = scratch_seed[k];
+                }
+            }
+
             return (int64_t) (i + 1u);
         }
     }
@@ -80,6 +98,6 @@ int vectra_bridge_release(int64_t handle) {
         return -1;
     }
 
-    memset(context, 0, sizeof(*context));
+    clear_bytes((uint8_t*) context, sizeof(*context));
     return 0;
 }
