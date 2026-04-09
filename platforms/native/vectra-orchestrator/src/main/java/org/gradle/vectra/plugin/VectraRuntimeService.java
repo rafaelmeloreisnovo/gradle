@@ -5,6 +5,7 @@ import org.gradle.api.logging.Logging;
 import org.gradle.api.services.BuildService;
 import org.gradle.api.services.BuildServiceParameters;
 
+import java.io.File;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -16,26 +17,28 @@ public abstract class VectraRuntimeService implements BuildService<BuildServiceP
     private final AtomicBoolean noopMode = new AtomicBoolean(false);
     private final AtomicInteger steps = new AtomicInteger(0);
 
-    public VectraBackend resolveBackend(String configuredBackend, boolean engineEnabled) {
+    public VectraBackend resolveBackend(
+        String configuredBackend,
+        boolean engineEnabled,
+        String configuredAssemblerTool,
+        String configuredCCompilerTool,
+        String toolchainDirectory
+    ) {
         if (!engineEnabled) {
             noopMode.set(true);
             return VectraBackend.JAVA;
         }
 
-        VectraBackend backend = VectraBackend.parse(configuredBackend);
-        if (backend == VectraBackend.JAVA) {
-            noopMode.set(false);
-            return backend;
+        VectraBackend requestedBackend;
+        try {
+            requestedBackend = VectraBackend.parse(configuredBackend);
+        } catch (IllegalArgumentException ex) {
+            throw new VectraNativeLoadException("Invalid Vectra backend configuration: " + configuredBackend, ex);
         }
 
-        if (!isNativeBackendAvailable(backend)) {
-            noopMode.set(true);
-            LOGGER.warn("Vectra backend '{}' is unavailable. Falling back to noop mode.", backend.name().toLowerCase(Locale.ROOT));
-            return backend;
-        }
-
+        VectraBackend selectedBackend = selectBestAvailableBackend(requestedBackend, configuredAssemblerTool, configuredCCompilerTool, toolchainDirectory);
         noopMode.set(false);
-        return backend;
+        return selectedBackend;
     }
 
     public void markInitialized() {
@@ -58,10 +61,73 @@ public abstract class VectraRuntimeService implements BuildService<BuildServiceP
         return noopMode.get();
     }
 
-    private boolean isNativeBackendAvailable(VectraBackend backend) {
+    private VectraBackend selectBestAvailableBackend(
+        VectraBackend requestedBackend,
+        String configuredAssemblerTool,
+        String configuredCCompilerTool,
+        String toolchainDirectory
+    ) {
+        switch (requestedBackend) {
+            case ASM:
+                if (isNativeBackendAvailable(VectraBackend.ASM, configuredAssemblerTool, configuredCCompilerTool, toolchainDirectory)) {
+                    return VectraBackend.ASM;
+                }
+                LOGGER.warn("Vectra backend '{}' is unavailable. Falling back to c backend.", requestedBackend.name().toLowerCase(Locale.ROOT));
+                if (isNativeBackendAvailable(VectraBackend.C, configuredAssemblerTool, configuredCCompilerTool, toolchainDirectory)) {
+                    return VectraBackend.C;
+                }
+                LOGGER.warn("Vectra backend 'c' is unavailable. Falling back to java backend.");
+                return VectraBackend.JAVA;
+            case C:
+                if (isNativeBackendAvailable(VectraBackend.C, configuredAssemblerTool, configuredCCompilerTool, toolchainDirectory)) {
+                    return VectraBackend.C;
+                }
+                LOGGER.warn("Vectra backend 'c' is unavailable. Falling back to java backend.");
+                return VectraBackend.JAVA;
+            case JAVA:
+                return VectraBackend.JAVA;
+            default:
+                throw new VectraNativeLoadException("Unsupported backend state encountered: " + requestedBackend);
+        }
+    }
+
+    private boolean isNativeBackendAvailable(
+        VectraBackend backend,
+        String configuredAssemblerTool,
+        String configuredCCompilerTool,
+        String toolchainDirectory
+    ) {
+        if (backend == VectraBackend.ASM && configuredAssemblerTool != null && !configuredAssemblerTool.isBlank()) {
+            return true;
+        }
+        if (backend == VectraBackend.C && configuredCCompilerTool != null && !configuredCCompilerTool.isBlank()) {
+            return true;
+        }
+
+        if (toolchainDirectory != null && !toolchainDirectory.isBlank()) {
+            File binDir = new File(toolchainDirectory);
+            if (backend == VectraBackend.ASM && hasTool(binDir, "as", "clang", "ml64")) {
+                return true;
+            }
+            if (backend == VectraBackend.C && hasTool(binDir, "cc", "clang", "gcc", "cl")) {
+                return true;
+            }
+        }
+
         String override = System.getProperty("org.gradle.vectra.native.available");
         if (override != null) {
             return Boolean.parseBoolean(override);
+        }
+        return false;
+    }
+
+    private boolean hasTool(File dir, String... commandNames) {
+        for (String commandName : commandNames) {
+            File unix = new File(dir, commandName);
+            File windows = new File(dir, commandName + ".exe");
+            if (unix.isFile() || windows.isFile()) {
+                return true;
+            }
         }
         return false;
     }
