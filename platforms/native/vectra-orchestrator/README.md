@@ -46,3 +46,15 @@ Consulte `CONTRIBUTING.md` para checklist obrigatório de review.
 Relatórios gerados:
 - `build/reports/vectra/perf-report-v1-<platform>.json` (versionado);
 - `build/reports/vectra/perf-summary.md` (matriz comparativa `java puro` vs `c` vs `asm`).
+## Seleção de backend e relatório de capacidades
+O pacote `org.gradle.vectra.runtime` detecta capacidades do host (SO, arquitetura, SIMD e toolchain), aplica a política de seleção com prioridade `asm nativo > c nativo > java puro` e persiste a decisão por build em:
+
+- `build/reports/vectra/capabilities.json`
+
+## Limitações por plataforma
+- **Linux x86_64 / aarch64:** caminhos `asm` e `c` são elegíveis quando toolchain correspondente está disponível.
+- **macOS x86_64 / aarch64:** caminhos `asm` e `c` são elegíveis quando toolchain correspondente está disponível.
+- **Windows x86_64:** caminho `asm` depende de `ml64`/`clang`; caminho `c` depende de `cl`/`clang`/`gcc`.
+- **Windows aarch64:** atualmente só há fallback garantido para `java puro` até haver cobertura de toolchain e artefatos nativos dedicados.
+- **Arquiteturas fora de x86_64/aarch64:** fallback obrigatório para `java puro`.
+- **Detecção SIMD em JVM:** não executa probing nativo de instruções; usa baseline por arquitetura e hint opcional via propriedade `-Dvectra.simd=...`.
