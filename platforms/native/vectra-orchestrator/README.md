@@ -29,6 +29,7 @@ The native implementation is partitioned into:
 - The native bridge currently operates with a preallocated state pool.
 - Gradle task-level parallelism is constrained by the shared build service registration (`maxParallelUsages = 1`) to avoid cross-thread contention while the bridge remains conservative.
 - For future work, thread-local state (`_Thread_local` in C11) is preferred over lock-based contention in high-concurrency workloads.
+- `src/main/asm/vectra_pulse.S`: vector mixing routine used by the coremaster
 
 ## Allocation and runtime policy
 Dynamic allocation is not allowed in the critical path (`step`/`collapse`).
@@ -58,6 +59,9 @@ The `org.gradle.vectra.runtime` package detects host capabilities (OS, architect
 - assembly is selected only for architectures with an implementation currently in the repository (x86_64);
 - aarch64 hosts can still use native C and pure Java fallback paths.
 
+- assembly is selected only for architectures with an implementation currently in the repository (x86_64);
+- aarch64 hosts can still use native C and pure Java fallback paths.
+
 - `build/reports/vectra/capabilities.json`
 
 ## Platform limitations
@@ -65,6 +69,9 @@ The `org.gradle.vectra.runtime` package detects host capabilities (OS, architect
 - **Linux aarch64:** only `c` and `pure java` are currently eligible because there is no `asm` implementation in this module yet.
 - **macOS x86_64:** `asm` and `c` paths are eligible when the corresponding toolchain is available.
 - **macOS aarch64:** only `c` and `pure java` are currently eligible because there is no `asm` implementation in this module yet.
+- **Linux x86_64 / aarch64:** `asm` and `c` paths are eligible when the corresponding toolchain is available.
+- **macOS x86_64 / aarch64:** `asm` and `c` paths are eligible when the corresponding toolchain is availabl
+- master
 - **Windows x86_64:** `asm` path depends on `ml64`/`clang`; `c` path depends on `cl`/`clang`/`gcc`.
 - **Windows aarch64:** currently only `pure java` fallback is guaranteed until dedicated toolchain coverage and native artifacts are available.
 - **Architectures other than x86_64/aarch64:** mandatory fallback to `pure java`.
@@ -79,12 +86,8 @@ vectraOrchestrator {
     backend.set("asm")
     assemblerTool.set("/opt/toolchains/bin/as")
     cCompilerTool.set("/opt/toolchains/bin/clang")
-    toolchainDirectory.set(layout.projectDirectory.dir("/opt/toolchains/bin"))
 }
 ```
 
 When explicit tool names/paths are provided, they are preferred by runtime backend availability checks before fallback to generic host detection.
-
-
-## Pure Java fallback engine
-When native backends are unavailable, `JavaPureVectraEngine` is used as deterministic fallback. The implementation follows the same Q16.16 pipeline and output contracts (`step`, `collapse`, `inject`) and is validated by dedicated tests and concurrency stress checks.
+>>> master
