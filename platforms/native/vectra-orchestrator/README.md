@@ -29,3 +29,20 @@ A implementação nativa foi particionada em:
 Não é permitido uso de alocação dinâmica no caminho crítico (`step`/`collapse`).
 No caminho crítico também evitamos helpers de libc de ponto flutuante/memória para reduzir overhead e preservar previsibilidade.
 Consulte `CONTRIBUTING.md` para checklist obrigatório de review.
+
+## SLOs técnicos e benchmark
+- SLOs definidos para o módulo:
+  - alocações no hot path (`step/collapse`) = **0 por passo**;
+  - latência p95 por etapa (`init`, `step`, `collapse`, `inject`);
+  - uso de memória estável (delta alvo <= 1 MiB no macro benchmark).
+- Benchmarks micro e macro ficam em `src/performanceTest`.
+- Para executar benchmark e gate de regressão:
+
+```bash
+./gradlew :platforms:native:vectra-orchestrator:vectraPerfBenchmark
+./gradlew :platforms:native:vectra-orchestrator:vectraPerfGate
+```
+
+Relatórios gerados:
+- `build/reports/vectra/perf-report-v1-<platform>.json` (versionado);
+- `build/reports/vectra/perf-summary.md` (matriz comparativa `java puro` vs `c` vs `asm`).
