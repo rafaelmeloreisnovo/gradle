@@ -23,12 +23,16 @@ The native implementation is partitioned into:
 - `src/main/c/include/vectra_state.h`: fixed binary layout (512 bytes), 64-byte alignment, and little-endian convention.
 - `src/main/c/vectra_bridge.c`: C ABI bridge for JNI/Panama with a preallocated static pool and explicit lifecycle (`init`, `step`, `collapse`, `inject`, `release`).
 - `src/main/c/vectra_core.c`: deterministic math core with 56-cycle geometric dynamics in Q16.16 (derivative, antiderivative, recursive term, inversion, and 5 adaptive weights).
+<<<<<<< codex/improve-vectra-orchestrator-module-38fznv
 - `src/main/asm/vectra_pulse.S`: x86_64 vector mixing routine used by the core.
 
 ### Native state pool concurrency model
 - The native bridge currently operates with a preallocated state pool.
 - Gradle task-level parallelism is constrained by the shared build service registration (`maxParallelUsages = 1`) to avoid cross-thread contention while the bridge remains conservative.
 - For future work, thread-local state (`_Thread_local` in C11) is preferred over lock-based contention in high-concurrency workloads.
+=======
+- `src/main/asm/vectra_pulse.S`: vector mixing routine used by the core.
+>>>>>>> master
 
 ## Allocation and runtime policy
 Dynamic allocation is not allowed in the critical path (`step`/`collapse`).
@@ -54,21 +58,30 @@ Generated reports:
 
 ## Backend selection and capability report
 The `org.gradle.vectra.runtime` package detects host capabilities (OS, architecture, SIMD, and toolchain), applies the selection policy with priority `native asm > native c > pure java`, and persists the per-build decision to:
+<<<<<<< codex/improve-vectra-orchestrator-module-38fznv
 
 - assembly is selected only for architectures with an implementation currently in the repository (x86_64);
 - aarch64 hosts can still use native C and pure Java fallback paths.
+=======
+>>>>>>> master
 
 - `build/reports/vectra/capabilities.json`
 
 ## Platform limitations
+<<<<<<< codex/improve-vectra-orchestrator-module-38fznv
 - **Linux x86_64:** `asm` and `c` paths are eligible when the corresponding toolchain is available.
 - **Linux aarch64:** only `c` and `pure java` are currently eligible because there is no `asm` implementation in this module yet.
 - **macOS x86_64:** `asm` and `c` paths are eligible when the corresponding toolchain is available.
 - **macOS aarch64:** only `c` and `pure java` are currently eligible because there is no `asm` implementation in this module yet.
+=======
+- **Linux x86_64 / aarch64:** `asm` and `c` paths are eligible when the corresponding toolchain is available.
+- **macOS x86_64 / aarch64:** `asm` and `c` paths are eligible when the corresponding toolchain is available.
+>>>>>>> master
 - **Windows x86_64:** `asm` path depends on `ml64`/`clang`; `c` path depends on `cl`/`clang`/`gcc`.
 - **Windows aarch64:** currently only `pure java` fallback is guaranteed until dedicated toolchain coverage and native artifacts are available.
 - **Architectures other than x86_64/aarch64:** mandatory fallback to `pure java`.
 - **JVM SIMD detection:** does not execute native instruction probing; uses architecture baseline and an optional hint via `-Dvectra.simd=...`.
+<<<<<<< codex/improve-vectra-orchestrator-module-38fznv
 
 
 ## Explicit toolchain configuration
@@ -83,3 +96,5 @@ vectraOrchestrator {
 ```
 
 When explicit tool names/paths are provided, they are preferred by runtime backend availability checks before fallback to generic host detection.
+=======
+>>>>>>> master
