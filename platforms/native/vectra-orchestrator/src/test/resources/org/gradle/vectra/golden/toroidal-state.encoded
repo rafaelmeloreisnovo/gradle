@@ -1,0 +1,14 @@
+# Toroidal golden payload encoded in source form (no binary artifact)
+#
+# Interlaced codec contract:
+# - Uses VECTRA_LANES(32), VECTRA_PHASE_CYCLES(56), VECTRA_WEIGHTS(5), VECTRA_DIM(3), VECTRA_VERSION(2) as key material.
+# - Even-index bytes belong to stream_a, odd-index bytes to stream_b.
+# - Each stream byte is XOR-masked with a header-derived constant plus rolling index.
+#
+# This keeps fixture deterministic while avoiding checked-in binaries.
+format=toroidal-interlaced-v1
+payload_size=396
+mask_a=0x1d
+mask_b=0x5b
+stream_a=051c071e1918dd1af4e91716fd105e120d0ca30ed00a0b0a8504ca0901008302f0333f3eb938f6353534b736fc3f3332ad2ce2212928ab2ae82b2726a120ee2d5d5cdf5e94575b5ad5549a595150d35280434f4ec94886454544c7468c4f4342fd7cb2717978fb7ab87b7776f170be7d6d6cef6ea4676b6ae564aa696160e36250939f9e19985695959417965c9f93920d8c428189880b8a488b878601804e8dbdbc3fbe74b7bbba35b47ab9b1b033b260a3afae29a866a5a5a427a66cafa3a25ddc12d1d9d8
+stream_b=5b5a59585f5eb15c66ad5150de5666544b4a2748314e4d4c30426a4147463644507b79780c7e567d737202705c777574186a42696f6e1e6c4863616014664e651b1a6a18341f1d1c60123a1117166614200b09087c0e260d030272002c070504483a12393f3e4e3c1833313044361e352b2a5a28042f2d2c50220a2127265624f0dbd9d8acdef6ddd3d2a2d0fcd7d5d4b8cae2c9cfcebecce8c3c1c0b4c6eec5fbfa8af8d4fffdfc80f2daf1f7f686f4c0ebe9e89ceec6ede3e292e0cce7e5e4e89ab2999f9e
