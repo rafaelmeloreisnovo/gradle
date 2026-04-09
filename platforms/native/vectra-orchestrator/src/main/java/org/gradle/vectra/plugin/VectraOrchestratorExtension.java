@@ -1,5 +1,6 @@
 package org.gradle.vectra.plugin;
 
+import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.provider.Property;
 
@@ -30,4 +31,9 @@ public abstract class VectraOrchestratorExtension {
      * Optional explicit C compiler command/path (for example: cc, clang, cl, gcc, or an absolute path).
      */
     public abstract Property<String> getCCompilerTool();
+
+    /**
+     * Optional toolchain directory to prioritize over PATH-based probing.
+     */
+    public abstract DirectoryProperty getToolchainDirectory();
 }

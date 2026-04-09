@@ -2,12 +2,52 @@ package org.gradle.vectra.runtime;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Maps capabilities to backend selection policies.
  * Priority order: native assembly > native C > pure Java.
  */
 public class BackendSelector {
+
+
+    public SelectionDecision selectWithFallback(CapabilityReport capabilityReport, BackendLoader backendLoader, Consumer<String> warnLogger) {
+        SelectionDecision baseDecision = select(capabilityReport);
+        if (baseDecision.getBackend() == Backend.JAVA_PURE) {
+            return baseDecision;
+        }
+
+        if (baseDecision.getBackend() == Backend.NATIVE_ASM) {
+            try {
+                backendLoader.load(Backend.NATIVE_ASM);
+                return baseDecision;
+            } catch (VectraNativeLoadException ex) {
+                warnLogger.accept("Failed to load ASM backend: " + ex.getMessage() + ". Falling back to C backend.");
+                if (supportsNativeC(capabilityReport)) {
+                    try {
+                        backendLoader.load(Backend.NATIVE_C);
+                        return new SelectionDecision(Backend.NATIVE_C, List.of("Native C backend selected after ASM load failure."));
+                    } catch (VectraNativeLoadException cEx) {
+                        warnLogger.accept("Failed to load C backend: " + cEx.getMessage() + ". Falling back to Java backend.");
+                        return new SelectionDecision(Backend.JAVA_PURE, List.of("Pure Java backend selected after native load failures."));
+                    }
+                }
+                return new SelectionDecision(Backend.JAVA_PURE, List.of("Pure Java backend selected after ASM load failure."));
+            }
+        }
+
+        if (baseDecision.getBackend() == Backend.NATIVE_C) {
+            try {
+                backendLoader.load(Backend.NATIVE_C);
+                return baseDecision;
+            } catch (VectraNativeLoadException ex) {
+                warnLogger.accept("Failed to load C backend: " + ex.getMessage() + ". Falling back to Java backend.");
+                return new SelectionDecision(Backend.JAVA_PURE, List.of("Pure Java backend selected after C load failure."));
+            }
+        }
+
+        return baseDecision;
+    }
 
     public SelectionDecision select(CapabilityReport capabilityReport) {
         List<String> reasons = new ArrayList<>();
@@ -62,6 +102,11 @@ public class BackendSelector {
         CapabilityReport.Architecture architecture = capabilityReport.getArchitecture();
         return architecture == CapabilityReport.Architecture.X86_64
             || architecture == CapabilityReport.Architecture.AARCH64;
+    }
+
+    @FunctionalInterface
+    public interface BackendLoader {
+        void load(Backend backend);
     }
 
     public enum Backend {

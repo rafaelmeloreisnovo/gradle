@@ -42,6 +42,20 @@ class CapabilityDetectorTest {
     }
 
     @Test
+    void includesSimdFromProbeWhenAvailable() {
+        CapabilityDetector detector = new CapabilityDetector(
+            new FakeSystemInspector("Linux", "x86_64", ""),
+            command -> false,
+            (architecture, os) -> java.util.EnumSet.of(CapabilityReport.SimdInstruction.AVX2)
+        );
+
+        CapabilityReport report = detector.detect();
+
+        assertTrue(report.getSimdInstructions().contains(CapabilityReport.SimdInstruction.SSE2));
+        assertTrue(report.getSimdInstructions().contains(CapabilityReport.SimdInstruction.AVX2));
+    }
+
+    @Test
     void detectsWindowsAndToolchainFallbackCandidates() {
         CapabilityDetector detector = new CapabilityDetector(
             new FakeSystemInspector("Windows 11", "amd64", "sse2"),

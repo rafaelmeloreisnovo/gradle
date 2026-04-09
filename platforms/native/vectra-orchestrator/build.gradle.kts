@@ -13,6 +13,15 @@ java {
 }
 
 
+val vectraAsmSource = provider {
+    when (System.getProperty("os.arch", "unknown").lowercase()) {
+        "x86_64", "amd64" -> "src/main/asm/vectra_pulse.S"
+        "aarch64", "arm64" -> "src/main/asm/vectra_pulse_aarch64.S"
+        else -> ""
+    }
+}
+
+
 val vectraValidateAsmImplementation by tasks.registering {
     group = "verification"
     description = "Validates that the expected assembly source exists for the current host architecture."
@@ -87,7 +96,7 @@ val vectraInvariantReport by tasks.registering {
         val pass = tests - failures - skipped
         val html = buildString {
             appendLine("<!doctype html>")
-            appendLine("<html lang=\"pt-BR\"><head><meta charset=\"utf-8\" />")
+            appendLine("<html lang=\"en\"><head><meta charset=\"utf-8\" />")
             appendLine("<title>Vectra Invariants Compliance</title>")
             appendLine("<style>body{font-family:Arial,sans-serif;margin:24px;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ccc;padding:8px;text-align:left;} .PASS{color:#0a7d17;} .FAIL{color:#b00020;} .SKIPPED{color:#8a6d1d;}</style>")
             appendLine("</head><body>")
@@ -98,11 +107,12 @@ val vectraInvariantReport by tasks.registering {
             appendLine("<li>Passed: $pass</li>")
             appendLine("<li>Failures: $failures</li>")
             appendLine("<li>Skipped: $skipped</li>")
+            appendLine("<li>ASM source for current host: ${vectraAsmSource.get().ifEmpty { "not-applicable" }}</li>")
             appendLine("</ul>")
             appendLine("<h2>Validated scope</h2>")
             appendLine("<ol><li>Phase periodicity</li><li>Coherence/entropy limits</li><li>Attractor stability</li><li>Cross-backend determinism with golden vectors</li><li>Q16.16 numerical equivalence vs double</li><li>Toroidal serialization regression</li></ol>")
             appendLine("<h2>Detailed results</h2>")
-            appendLine("<table><thead><tr><th>Classe</th><th>Teste</th><th>Status</th></tr></thead><tbody>")
+            appendLine("<table><thead><tr><th>Class</th><th>Test</th><th>Status</th></tr></thead><tbody>")
             vectraCases.sortedWith(compareBy({ it.first }, { it.second })).forEach { (clazz, method, status) ->
                 appendLine("<tr><td>$clazz</td><td>$method</td><td class=\"$status\">$status</td></tr>")
             }

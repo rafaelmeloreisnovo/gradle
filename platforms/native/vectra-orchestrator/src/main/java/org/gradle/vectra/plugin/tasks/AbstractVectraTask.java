@@ -1,6 +1,7 @@
 package org.gradle.vectra.plugin.tasks;
 
 import org.gradle.api.DefaultTask;
+import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.Input;
@@ -26,6 +27,9 @@ public abstract class AbstractVectraTask extends DefaultTask {
     public abstract Property<String> getCCompilerTool();
 
     @Internal
+    public abstract DirectoryProperty getToolchainDirectory();
+
+    @Internal
     public abstract Property<VectraRuntimeService> getRuntimeService();
 
     public void configureRuntime(Provider<VectraRuntimeService> serviceProvider) {
@@ -34,11 +38,16 @@ public abstract class AbstractVectraTask extends DefaultTask {
     }
 
     protected VectraBackend resolveBackend() {
+        String toolchainDir = getToolchainDirectory().isPresent()
+            ? getToolchainDirectory().get().getAsFile().getAbsolutePath()
+            : "";
+
         return getRuntimeService().get().resolveBackend(
             getBackend().get(),
             getEngineEnabled().get(),
             getAssemblerTool().getOrElse(""),
-            getCCompilerTool().getOrElse("")
+            getCCompilerTool().getOrElse(""),
+            toolchainDir
         );
     }
 }

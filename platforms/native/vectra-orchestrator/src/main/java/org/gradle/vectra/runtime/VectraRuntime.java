@@ -1,9 +1,13 @@
 package org.gradle.vectra.runtime;
 
+import org.gradle.vectra.engine.VectraEngine;
+
 /**
  * Entry point for capability detection, backend selection and decision report persistence.
  */
 public class VectraRuntime {
+
+    private final VectraEngine javaPureEngine = new JavaPureVectraEngine();
 
     private final CapabilityDetector capabilityDetector;
     private final BackendSelector backendSelector;
@@ -17,6 +21,14 @@ public class VectraRuntime {
         this.capabilityDetector = capabilityDetector;
         this.backendSelector = backendSelector;
         this.reportWriter = reportWriter;
+    }
+
+    public VectraEngine resolveEngine(BackendSelector.SelectionDecision decision) {
+        if (decision.getBackend() == BackendSelector.Backend.JAVA_PURE) {
+            return javaPureEngine;
+        }
+        // Native engine wiring will be provided by JNI/Panama bridge integration.
+        return javaPureEngine;
     }
 
     public BackendSelector.SelectionDecision selectBackendForCurrentBuild() {
