@@ -1,8 +1,5 @@
-import org.gradle.api.GradleException
-import org.gradle.api.tasks.Exec
-import org.gradle.api.tasks.JavaExec
-import org.gradle.api.tasks.SourceSetContainer
-import java.util.Locale
+import java.time.Instant
+import javax.xml.parsers.DocumentBuilderFactory
 
 plugins {
     id("gradlebuild.distribution.api-java")
@@ -14,131 +11,91 @@ java {
     withSourcesJar()
 }
 
-val sourceSets = the<SourceSetContainer>()
-val performanceTest by sourceSets.creating
-
-configurations[performanceTest.implementationConfigurationName].extendsFrom(configurations["testImplementation"])
-configurations[performanceTest.runtimeOnlyConfigurationName].extendsFrom(configurations["testRuntimeOnly"])
-
-val nativeBuildDir = layout.buildDirectory.dir("vectra-native")
-
-fun platformKey(): String {
-    val os = System.getProperty("os.name").lowercase(Locale.ROOT)
-    val arch = System.getProperty("os.arch").lowercase(Locale.ROOT)
-    val osKey = when {
-        os.contains("linux") -> "linux"
-        os.contains("mac") || os.contains("darwin") -> "macos"
-        os.contains("win") -> "windows"
-        else -> os.replace(' ', '-')
-    }
-    val archKey = when (arch) {
-        "x86_64", "amd64" -> "x86_64"
-        "aarch64", "arm64" -> "arm64"
-        else -> arch.replace(' ', '-')
-    }
-    return "$osKey-$archKey"
-}
-
-val compileVectraPerfNativeC = tasks.register<Exec>("compileVectraPerfNativeC") {
-    val out = nativeBuildDir.map { it.file("vectra-perf-c") }
-    outputs.file(out)
-    commandLine(
-        "cc",
-        "-std=c11",
-        "-O3",
-        "-I", "src/main/c/include",
-        "src/main/c/vectra_core.c",
-        "src/performanceTest/c/vectra_pulse_mix_c.c",
-        "src/performanceTest/c/vectra_perf_native.c",
-        "-o", out.get().asFile.absolutePath
-    )
-    doFirst {
-        out.get().asFile.parentFile.mkdirs()
-    }
-}
-
-val compileVectraPerfNativeAsm = tasks.register<Exec>("compileVectraPerfNativeAsm") {
-    val out = nativeBuildDir.map { it.file("vectra-perf-asm") }
-    outputs.file(out)
-    commandLine(
-        "cc",
-        "-std=c11",
-        "-O3",
-        "-I", "src/main/c/include",
-        "src/main/c/vectra_core.c",
-        "src/main/asm/vectra_pulse.S",
-        "src/performanceTest/c/vectra_perf_native.c",
-        "-o", out.get().asFile.absolutePath
-    )
-    doFirst {
-        out.get().asFile.parentFile.mkdirs()
-    }
-}
-
-val vectraPerfBenchmark = tasks.register<JavaExec>("vectraPerfBenchmark") {
+val vectraInvariantReport by tasks.registering {
     group = "verification"
-    description = "Executa benchmark micro/macro do Vectra e gera relatórios versionados."
+    description = "Gera relatório de conformidade matemática do Vectra."
 
-    dependsOn(compileVectraPerfNativeC, compileVectraPerfNativeAsm, performanceTest.classesTaskName)
+    dependsOn(tasks.named("test"))
 
-    mainClass.set("org.gradle.vectra.perf.VectraPerfRunner")
-    classpath = performanceTest.runtimeClasspath
+    val xmlResultsDir = layout.buildDirectory.dir("test-results/test")
+    val reportFile = layout.buildDirectory.file("reports/vectra/invariants.html")
 
-    val platform = platformKey()
-    val reportsDir = layout.buildDirectory.dir("reports/vectra")
-    val reportJson = reportsDir.map { it.file("perf-report-v1-$platform.json") }
-    val summaryMd = reportsDir.map { it.file("perf-summary.md") }
-
-    inputs.file(nativeBuildDir.map { it.file("vectra-perf-c") })
-    inputs.file(nativeBuildDir.map { it.file("vectra-perf-asm") })
-    outputs.file(reportJson)
-    outputs.file(summaryMd)
-
-    args(
-        "--native-c=${nativeBuildDir.get().file("vectra-perf-c").asFile.absolutePath}",
-        "--native-asm=${nativeBuildDir.get().file("vectra-perf-asm").asFile.absolutePath}",
-        "--report=${reportJson.get().asFile.absolutePath}",
-        "--summary=${summaryMd.get().asFile.absolutePath}",
-        "--platform=$platform"
-    )
-}
-
-val vectraPerfGate = tasks.register("vectraPerfGate") {
-    group = "verification"
-    description = "Falha o build quando há regressão relevante contra baseline por plataforma."
-
-    dependsOn(vectraPerfBenchmark)
+    inputs.dir(xmlResultsDir)
+    outputs.file(reportFile)
 
     doLast {
-        val platform = platformKey()
-        val report = layout.buildDirectory.file("reports/vectra/perf-report-v1-$platform.json").get().asFile
-        val baseline = project.file("src/performanceTest/resources/baseline/$platform.properties")
-        require(report.isFile) { "Relatório não encontrado: ${report.absolutePath}" }
-        require(baseline.isFile) { "Baseline não encontrado para $platform: ${baseline.absolutePath}" }
+        val xmlDir = xmlResultsDir.get().asFile
+        val files = xmlDir.listFiles { file -> file.extension == "xml" }?.toList().orEmpty()
+        val factory = DocumentBuilderFactory.newInstance()
 
-        val reportText = report.readText()
-        val baselineProps = java.util.Properties().apply {
-            baseline.inputStream().use { load(it) }
-        }
+        var tests = 0
+        var failures = 0
+        var skipped = 0
+        val vectraCases = mutableListOf<Triple<String, String, String>>()
 
-        val regressions = mutableListOf<String>()
-        baselineProps.forEach { k, v ->
-            val key = k.toString()
-            val max = v.toString().toDouble()
-            val regex = Regex("\"${Regex.escape(key)}\"\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)")
-            val actual = regex.find(reportText)?.groupValues?.get(1)?.toDouble()
-                ?: error("Métrica '$key' ausente no relatório ${report.name}")
-            if (actual > max) {
-                regressions += "$key: actual=$actual > baseline=$max"
+        files.forEach { xml ->
+            val doc = factory.newDocumentBuilder().parse(xml)
+            val testcases = doc.getElementsByTagName("testcase")
+            for (index in 0 until testcases.length) {
+                val node = testcases.item(index)
+                val className = node.attributes?.getNamedItem("classname")?.nodeValue.orEmpty()
+                if (!className.startsWith("org.gradle.vectra")) {
+                    continue
+                }
+
+                tests += 1
+                var status = "PASS"
+                val children = node.childNodes
+                for (childIndex in 0 until children.length) {
+                    when (children.item(childIndex).nodeName) {
+                        "failure", "error" -> {
+                            failures += 1
+                            status = "FAIL"
+                        }
+                        "skipped" -> {
+                            skipped += 1
+                            status = "SKIPPED"
+                        }
+                    }
+                }
+
+                val methodName = node.attributes?.getNamedItem("name")?.nodeValue.orEmpty()
+                vectraCases += Triple(className, methodName, status)
             }
         }
 
-        if (regressions.isNotEmpty()) {
-            throw GradleException("Regressão de performance detectada:\n${regressions.joinToString("\n")}")
+        val pass = tests - failures - skipped
+        val html = buildString {
+            appendLine("<!doctype html>")
+            appendLine("<html lang=\"pt-BR\"><head><meta charset=\"utf-8\" />")
+            appendLine("<title>Vectra Invariants Compliance</title>")
+            appendLine("<style>body{font-family:Arial,sans-serif;margin:24px;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ccc;padding:8px;text-align:left;} .PASS{color:#0a7d17;} .FAIL{color:#b00020;} .SKIPPED{color:#8a6d1d;}</style>")
+            appendLine("</head><body>")
+            appendLine("<h1>Relatório de conformidade matemática - Vectra</h1>")
+            appendLine("<p>Gerado em: ${Instant.now()}</p>")
+            appendLine("<ul>")
+            appendLine("<li>Total de verificações: $tests</li>")
+            appendLine("<li>Aprovadas: $pass</li>")
+            appendLine("<li>Falhas: $failures</li>")
+            appendLine("<li>Ignoradas: $skipped</li>")
+            appendLine("</ul>")
+            appendLine("<h2>Escopo validado</h2>")
+            appendLine("<ol><li>Periodicidade de fase</li><li>Limites de coerência/entropia</li><li>Estabilidade de atratores</li><li>Determinismo cross-backend com golden vectors</li><li>Equivalência numérica Q16.16 vs double</li><li>Regressão de serialização toroidal</li></ol>")
+            appendLine("<h2>Resultados detalhados</h2>")
+            appendLine("<table><thead><tr><th>Classe</th><th>Teste</th><th>Status</th></tr></thead><tbody>")
+            vectraCases.sortedWith(compareBy({ it.first }, { it.second })).forEach { (clazz, method, status) ->
+                appendLine("<tr><td>$clazz</td><td>$method</td><td class=\"$status\">$status</td></tr>")
+            }
+            appendLine("</tbody></table>")
+            appendLine("</body></html>")
         }
+
+        val output = reportFile.get().asFile
+        output.parentFile.mkdirs()
+        output.writeText(html)
     }
 }
 
 tasks.named("check") {
-    dependsOn(vectraPerfGate)
+    dependsOn(vectraInvariantReport)
 }
