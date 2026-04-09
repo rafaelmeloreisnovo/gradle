@@ -17,7 +17,11 @@ public class BackendSelector {
             return new SelectionDecision(Backend.NATIVE_ASM, reasons);
         }
 
-        reasons.add("Native assembly backend skipped due to missing policy requirements.");
+        if (capabilityReport.getArchitecture() == CapabilityReport.Architecture.AARCH64) {
+            reasons.add("Native assembly backend skipped: no aarch64 assembly implementation is currently available.");
+        } else {
+            reasons.add("Native assembly backend skipped due to missing policy requirements.");
+        }
 
         if (supportsNativeC(capabilityReport)) {
             reasons.add("Native C backend selected: C toolchain available on supported platform/architecture.");
@@ -31,9 +35,14 @@ public class BackendSelector {
 
     private boolean supportsNativeAssembly(CapabilityReport capabilityReport) {
         return isSupportedPlatform(capabilityReport)
-            && isSupportedArchitecture(capabilityReport)
+            && hasAssemblyImplementation(capabilityReport)
             && !capabilityReport.getSimdInstructions().isEmpty()
             && capabilityReport.getToolchainAvailability().isAssemblerAvailable();
+    }
+
+
+    private boolean hasAssemblyImplementation(CapabilityReport capabilityReport) {
+        return capabilityReport.getArchitecture() == CapabilityReport.Architecture.X86_64;
     }
 
     private boolean supportsNativeC(CapabilityReport capabilityReport) {
