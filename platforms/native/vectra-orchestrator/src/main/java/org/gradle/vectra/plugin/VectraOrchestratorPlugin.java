@@ -39,6 +39,8 @@ public abstract class VectraOrchestratorPlugin implements Plugin<Project> {
         task.getEngineEnabled().convention(extension.getEnabled());
         task.getDeterministicMode().convention(extension.getDeterministic());
         task.getBackend().convention(extension.getBackend());
+        task.getAssemblerTool().convention(extension.getAssemblerTool());
+        task.getCCompilerTool().convention(extension.getCCompilerTool());
         task.configureRuntime(runtimeService);
     }
 }

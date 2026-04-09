@@ -39,6 +39,20 @@ class BackendSelectorTest {
     }
 
     @Test
+    void fallsBackToNativeCOnAarch64EvenWhenAssemblerExists() {
+        CapabilityReport capabilityReport = new CapabilityReport(
+            CapabilityReport.OperatingSystem.LINUX,
+            CapabilityReport.Architecture.AARCH64,
+            EnumSet.of(CapabilityReport.SimdInstruction.NEON),
+            new CapabilityReport.ToolchainAvailability(true, true)
+        );
+
+        BackendSelector.SelectionDecision decision = backendSelector.select(capabilityReport);
+
+        assertEquals(BackendSelector.Backend.NATIVE_C, decision.getBackend());
+    }
+
+    @Test
     void selectsPureJavaWhenNoNativeToolchainsAreAvailableOnWindows() {
         CapabilityReport capabilityReport = new CapabilityReport(
             CapabilityReport.OperatingSystem.WINDOWS,

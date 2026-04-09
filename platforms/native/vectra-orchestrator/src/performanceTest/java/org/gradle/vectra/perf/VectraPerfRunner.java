@@ -167,13 +167,13 @@ public final class VectraPerfRunner {
         sb.append("- platform: `").append(platform).append("`\n");
         sb.append("- generated_at: `").append(Instant.now()).append("`\n\n");
 
-        sb.append("## SLOs técnicos\n\n");
-        sb.append("- Alocações no hot path (`step/collapse`): **0 por passo**.\n");
-        sb.append("- Latência p95 por etapa (`init/step/collapse/inject`) rastreada por implementação.\n");
-        sb.append("- Memória estável: delta máximo alvo <= **1 MiB** durante macro benchmark.\n\n");
+        sb.append("## Technical SLOs\n\n");
+        sb.append("- Hot-path allocations (`step/collapse`): **0 per step**.\n");
+        sb.append("- p95 latency per stage (`init/step/collapse/inject`) tracked by implementation.\n");
+        sb.append("- Stable memory: target max delta <= **1 MiB** during macro benchmark.\n\n");
 
         sb.append("## Matriz comparativa (`java puro` vs `c` vs `asm`)\n\n");
-        sb.append("| Implementação | p95 init (ns) | p95 step (ns) | p95 collapse (ns) | p95 inject (ns) | alloc/step | macro total (ms) | memória (bytes) |\n");
+        sb.append("| Implementation | p95 init (ns) | p95 step (ns) | p95 collapse (ns) | p95 inject (ns) | alloc/step | macro total (ms) | memory (bytes) |\n");
         sb.append("|---|---:|---:|---:|---:|---:|---:|---:|\n");
         for (PerfResult r : results) {
             sb.append("| ").append(r.impl).append(" | ")

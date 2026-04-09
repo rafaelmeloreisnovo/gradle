@@ -9,8 +9,8 @@ Forbidden in `src/main/c/vectra_core.c`, `src/main/c/vectra_bridge.c`, and any n
 - C++ `new`/`delete` (if C++ wrappers are introduced)
 
 ## Native runtime policy
-Para reduzir overhead e fricção no caminho crítico, evitar dependência de rotinas da libc dentro de `step/collapse` e dos helpers chamados por elas (ex.: `memset`, `memcpy`, `sin`, `log`, `sqrt`).
-Use implementações determinísticas locais (Q16.16, tabelas fixas e laços explícitos) sempre que possível.
+To reduce overhead and friction in the critical path, avoid depending on libc routines inside `step/collapse` and helpers called by them (for example `memset`, `memcpy`, `sin`, `log`, `sqrt`).
+Use local deterministic implementations (Q16.16, fixed tables, and explicit loops) whenever possible.
 
 ## Review checks (mandatory)
 Run the checks below during review:
