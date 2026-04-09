@@ -17,3 +17,15 @@ Os diretórios `src/main/c` e `src/main/asm` já estão provisionados para evolu
 
 ## Compatibilidade com Gradle
 A integração é compatível com o comportamento padrão do Gradle: o módulo adiciona capacidades isoladas e opt-in, sem mudar defaults de builds existentes.
+
+## Núcleo nativo (layout e ciclo de vida)
+A implementação nativa foi particionada em:
+- `src/main/c/include/vectra_state.h`: layout binário fixo (512 bytes), alinhamento 64 bytes e convenção little-endian.
+- `src/main/c/vectra_bridge.c`: bridge C ABI para JNI/Panama com pool estático pré-alocado e ciclo de vida explícito (`init`, `step`, `collapse`, `inject`, `release`).
+- `src/main/c/vectra_core.c`: núcleo matemático determinístico com dinâmica geométrica de 56 ciclos em Q16.16 (derivada, antiderivada, termo recursivo, inversão e 5 pesos adaptativos).
+- `src/main/asm/vectra_pulse.S`: rotina de mistura vetorial usada pelo core.
+
+## Política de alocação e runtime
+Não é permitido uso de alocação dinâmica no caminho crítico (`step`/`collapse`).
+No caminho crítico também evitamos helpers de libc de ponto flutuante/memória para reduzir overhead e preservar previsibilidade.
+Consulte `CONTRIBUTING.md` para checklist obrigatório de review.
