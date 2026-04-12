@@ -4,6 +4,7 @@ import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.api.services.BuildService;
 import org.gradle.api.services.BuildServiceParameters;
+import org.gradle.vectra.runtime.VectraNativeLoadException;
 
 import java.io.File;
 import java.util.Locale;

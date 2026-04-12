@@ -96,7 +96,7 @@ val vectraInvariantReport by tasks.registering {
         val pass = tests - failures - skipped
         val html = buildString {
             appendLine("<!doctype html>")
-            appendLine("<html lang=\"pt-BR\"><head><meta charset=\"utf-8\" />")
+            appendLine("<html lang=\"en\"><head><meta charset=\"utf-8\" />")
             appendLine("<title>Vectra Invariants Compliance</title>")
             appendLine("<style>body{font-family:Arial,sans-serif;margin:24px;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ccc;padding:8px;text-align:left;} .PASS{color:#0a7d17;} .FAIL{color:#b00020;} .SKIPPED{color:#8a6d1d;}</style>")
             appendLine("</head><body>")
