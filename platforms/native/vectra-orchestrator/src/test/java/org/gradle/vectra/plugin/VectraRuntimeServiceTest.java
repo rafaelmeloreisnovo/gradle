@@ -2,7 +2,6 @@ package org.gradle.vectra.plugin;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.gradle.vectra.runtime.VectraNativeLoadException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

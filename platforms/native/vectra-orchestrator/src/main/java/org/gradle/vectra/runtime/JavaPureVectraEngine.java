@@ -118,9 +118,11 @@ public class JavaPureVectraEngine implements VectraEngine {
             applyAdaptiveWeights(state);
             state.tick++;
 
+            int originalPosition = outputBuffer.position();
             for (int i = 0; i < STEP_OUTPUT_BYTES; i++) {
                 outputBuffer.put((byte) (state.lane[i] & 0xFF));
             }
+            outputBuffer.position(originalPosition);
         }
 
         return 0;
