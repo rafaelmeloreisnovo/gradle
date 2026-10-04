@@ -1,0 +1,32 @@
+name: RAFCODE authorial L0
+
+on:
+  pull_request:
+    paths:
+      - 'rafcode/l0/**'
+      - '.github/workflows/rafcode-l0.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'rafcode/l0/**'
+      - '.github/workflows/rafcode-l0.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fetch exact ref without marketplace actions
+        shell: sh
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --depth=1 origin "$GITHUB_REF"
+          git checkout --detach FETCH_HEAD
+      - name: Verify authorial L0 leaf
+        shell: sh
+        run: sh rafcode/l0/verify.sh
