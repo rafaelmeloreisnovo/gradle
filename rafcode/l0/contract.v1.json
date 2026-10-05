@@ -1,0 +1,42 @@
+{
+  "schema": "rafcodephi.authorial-l0-leaf/v1",
+  "repository": "rafaelmeloreisnovo/gradle",
+  "role": "build-capability-gate",
+  "authority": {
+    "semantic_contract": "rafaelmeloreisnovo/RafPolimata:federation/functional-freestanding-leaf.v1.json",
+    "local_source": "rafcode/l0/kernel.c",
+    "local_gate": "rafcode/l0/verify.sh"
+  },
+  "provenance": {
+    "upstream_state": "THIRD_PARTY_LICENSED",
+    "upstream_record": "THIRD_PARTY_NOTICES_RAFAELIA.md",
+    "authorial_scope": [
+      "rafcode/l0/**",
+      ".github/workflows/rafcode-l0.yml"
+    ],
+    "whole_repository_authorship": false,
+    "authority_transfer": false,
+    "body_copy_required": false
+  },
+  "runtime": {
+    "hosted_headers": false,
+    "libc": false,
+    "heap": false,
+    "syscalls": false,
+    "recursion": false,
+    "unbounded_control_flow": false,
+    "external_runtime_symbols": false
+  },
+  "factory": {
+    "compiler_required_for_evidence": true,
+    "object_inspector_required_for_evidence": true,
+    "gradle_runtime_required": false,
+    "factory_dependency_is_runtime_dependency": false
+  },
+  "claims": {
+    "implemented_is_pass": false,
+    "gradle_replacement": false,
+    "physical_execution": "TOKEN_VAZIO",
+    "claim_allowed_without_gate": false
+  }
+}
